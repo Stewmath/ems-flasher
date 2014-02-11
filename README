@@ -47,6 +47,11 @@ by the Windows software).
 
 For a full list of options, run the command with the --help flag.
 
+MULTIROM SUPPORT
+
+The options "--add", "--delete", and "--list" handle multirom support. See 
+examples for usage.
+
 EXAMPLES
 
 # write the ROM to the cart
@@ -57,6 +62,17 @@ EXAMPLES
 
 # print out the title
 ./ems-flasher --title
+
+MULTIROM EXAMPLES
+
+# Setup the bank for gameboy [color] mode
+./ems-flasher --write menu.gb[c]
+
+# Add a rom to the bank
+./ems-flasher --add totally_legit_rom.gb
+
+# Remove the first rom from the bank
+./ems-flasher --delete 2
 
 BUGS
 

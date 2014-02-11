@@ -6,6 +6,8 @@
 #include <string.h>
 
 #include "ems.h"
+#include "multirom.h"
+#include "main.h"
 
 // don't forget to bump this :P
 #define VERSION "0.02"
@@ -17,19 +19,12 @@
 const int limits[3] = {0, BANK_SIZE, SRAM_SIZE};
 
 // operation mode
-#define MODE_READ   1
-#define MODE_WRITE  2
-#define MODE_TITLE  3
-
-/* options */
-typedef struct _options_t {
-    int verbose;
-    int blocksize;
-    int mode;
-    char *file;
-    int bank;
-    int space;
-} options_t;
+#define MODE_READ    1
+#define MODE_WRITE   2
+#define MODE_TITLE   3
+#define MODE_LIST    4
+#define MODE_ADD     5
+#define MODE_DELETE  6
 
 // defaults
 options_t opts = {
@@ -37,6 +32,7 @@ options_t opts = {
     .blocksize          = 0,
     .mode               = 0,
     .file               = NULL,
+    .id                 = 0,
     .bank               = 0,
     .space              = 0,
 };
@@ -50,20 +46,6 @@ const unsigned char nintylogo[0x30] =
     0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
     0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E};
 
-//offsets to parts of the cart header
-enum headeroffsets {
-    HEADER_LOGO = 0x104,
-    HEADER_TITLE = 0x134,
-    HEADER_CGBFLAG = 0x143,
-    HEADER_SGBFLAG = 0x146,
-    HEADER_ROMSIZE = 0x148,
-    HEADER_RAMSIZE = 0x149,
-    HEADER_REGION = 0x14A,
-    HEADER_OLDLICENSEE = 0x14B,
-    HEADER_ROMVER = 0x14C,
-    HEADER_CHKSUM = 0x14D,
-};
-
 // default blocksizes
 #define BLOCKSIZE_READ  4096
 #define BLOCKSIZE_WRITE 32
@@ -72,7 +54,9 @@ enum headeroffsets {
  * Usage
  */
 void usage(char *name) {
-    printf("Usage: %s < --read | --write > [ --verbose ] <totally_legit_rom.gb>\n", name);
+    printf("Usage: %s < --read | --write | --add > [ --verbose ] <totally_legit_rom.gb>\n", name);
+    printf("       %s --list\n", name);
+    printf("       %s --delete <index>\n", name);
     printf("       %s --title\n", name);
     printf("       %s --version\n", name);
     printf("       %s --help\n", name);
@@ -85,8 +69,11 @@ void usage(char *name) {
     printf("    --bank <num>            select cart bank (1 or 2)\n");
     printf("    --save                  force write to SRAM\n");
     printf("    --rom                   force write to Flash ROM\n");
+    printf("    --list                  list the ROMs on the cartridge\n");
+    printf("    --add                   add a ROM to the nearest space it will fit\n");
+    printf("    --delete <index>        remove a ROM from the cartridge from the cartridge\n");
     printf("\n");
-    printf("You MUST supply exactly one of --read, --write, or --title\n");
+    //printf("You MUST supply exactly one of --read, --write, or --title\n");
     printf("Reading or writing with a file ending in .sav will write to SRAM.\n");
     printf("To select between ROM and SRAM, use ONE of the --save / --rom options.\n");
     printf("\n");
@@ -114,10 +101,14 @@ void get_options(int argc, char **argv) {
             {"read", 0, 0, 'r'},
             {"write", 0, 0, 'w'},
             {"title", 0, 0, 't'},
+            {"list", 0, 0, 'l'},
+            {"add", 0, 0, 'a'},
+            {"delete", 0, 0, 'd'},
             {"blocksize", 1, 0, 's'},
             {"bank", 1, 0, 'b'},
             {"save", 0, 0, 'S'},
             {"rom", 0, 0, 'R'},
+            {"setpal", 0, 0, 'P'},
             {0, 0, 0, 0}
         };
 
@@ -150,6 +141,18 @@ void get_options(int argc, char **argv) {
             case 't':
                 if (opts.mode != 0) goto mode_error;
                 opts.mode = MODE_TITLE;
+                break;
+            case 'l':
+                if (opts.mode != 0) goto mode_error;
+                opts.mode = MODE_LIST;
+                break;
+            case 'a':
+                if (opts.mode != 0) goto mode_error;
+                opts.mode = MODE_ADD;
+                break;
+            case 'd':
+                if (opts.mode != 0) goto mode_error;
+                opts.mode = MODE_DELETE;
                 break;
             case 's':
                 optval = atoi(optarg);
@@ -186,7 +189,7 @@ void get_options(int argc, char **argv) {
     if (opts.mode == 0)
         goto mode_error;
 
-    if (opts.mode == MODE_WRITE || opts.mode == MODE_READ) {
+    if (opts.mode == MODE_WRITE || opts.mode == MODE_READ || opts.mode == MODE_ADD) {
         // user didn't give a filename
         if (optind >= argc) {
             printf("Error: you must provide an %s filename\n", opts.mode == MODE_READ ? "output" : "input");
@@ -195,16 +198,25 @@ void get_options(int argc, char **argv) {
 
         // extra argument: ROM file
         opts.file = argv[optind];
-
-        // set a default blocksize if the user hasn't given one
-        if (opts.blocksize == 0)
-            opts.blocksize = opts.mode == MODE_READ ? BLOCKSIZE_READ : BLOCKSIZE_WRITE;
     }
+    else if (opts.mode == MODE_DELETE) {
+        if (optind >= argc) {
+            printf("Error: you must provide an id to delete (use --list to see id's)\n");
+            usage(argv[0]);
+        }
+
+        // extra argument: ROM file
+        opts.id = atoi(argv[optind]);
+    }
+
+    // set a default blocksize if the user hasn't given one
+    if (opts.blocksize == 0)
+        opts.blocksize = opts.mode == MODE_READ ? BLOCKSIZE_READ : BLOCKSIZE_WRITE;
 
     return;
 
 mode_error:
-    printf("Error: must supply exactly one of --read, --write, or --title\n");
+    printf("Error: must supply exactly one of --read, --write, --title, --add, --delete, or --list\n");
     usage(argv[0]);
 
 mode_error2:
@@ -455,6 +467,18 @@ int main(int argc, char **argv) {
             }
         }
     }
+    else if (opts.mode == MODE_LIST) {
+        readRoms(opts.bank);
+        listRoms();
+    }
+    else if (opts.mode == MODE_ADD) {
+        readRoms(opts.bank);
+        addRom(opts.file);
+    }
+    else if (opts.mode == MODE_DELETE) {
+        readRoms(opts.bank);
+        deleteRom(opts.id);
+    }
 
     // should never reach here
     else
@@ -464,4 +488,34 @@ int main(int argc, char **argv) {
     free(buf);
 
     return 0;
+}
+
+int getRomSize(int sizeCode) {
+    int size=0;
+    switch (sizeCode) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+            size = (32 << sizeCode)*0x400;
+            break;
+        case 0x52:
+            size = 1152*0x400;
+            break;
+        case 0x53:
+            size = 1280*0x400;
+            break;
+        case 0x54:
+            size = 1536*0x400;
+            break;
+        default:
+            size = 128*0x400;
+            printf("Unknown ROM size code\n");
+            break;
+    }
+    return size;
 }

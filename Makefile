@@ -1,5 +1,5 @@
 PROG = ems-flasher
-OBJS = ems.o main.o
+OBJS = ems.o main.o multirom.o
 
 CFLAGS  = -g -Wall -Werror -pedantic -std=c99
 CFLAGS += `pkg-config --cflags libusb-1.0`

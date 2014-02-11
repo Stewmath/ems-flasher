@@ -1,6 +1,7 @@
 #ifndef __EMS_H__
 #define __EMS_H__
 
+#include <stdlib.h>
 #include <stdint.h>
 
 int ems_init(void);
