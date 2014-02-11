@@ -76,10 +76,6 @@ MULTIROM EXAMPLES
 
 BUGS
 
-The software only handles a single ROM in the first bank of the cart.
-Reading and writing of SRAM is not supported (yet). The commands to do
-so have been discovered and they will appear in a future version.
-
 Preferably use the bug tracker found at the web site (at the top of this
 doc) to report any bugs.
 

@@ -66,7 +66,10 @@ void readRoms(int bank) {
 
 void listRoms() {
     for (int i=0; i<numRoms; i++) {
-        printf("%d: %s\n", i, roms[i]->title);
+        printf("%d: %s ", i, roms[i]->title);
+        if (opts.verbose)
+            printf(" (offset 0x%x, size 0x%x)", roms[i]->offset, roms[i]->size);
+        printf("\n");
     }
 }
 
