@@ -72,7 +72,7 @@ MULTIROM EXAMPLES
 ./ems-flasher --add totally_legit_rom.gb
 
 # Get a list of roms in the bank
-./ems-flasher -- list
+./ems-flasher --list
 
 # Remove the first rom from the bank
 ./ems-flasher --delete 1
