@@ -364,7 +364,7 @@ int main(int argc, char **argv) {
         //Verify cartridge header checksum while we're at it
         uint8_t calculated_chk = 0;
         for (i = HEADER_TITLE; i < HEADER_CHKSUM; i++) {
-            calculated_chk -= buf[i] - 1;
+            calculated_chk -= buf[i] + 1;
         }
 
         if (calculated_chk != buf[HEADER_CHKSUM]) {
