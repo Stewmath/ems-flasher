@@ -117,8 +117,10 @@ int addRom(const char* filename) {
     int base = offset/BANK_SIZE * BANK_SIZE;
     offset &= BANK_SIZE_MASK;
 
-    if (base/BANK_SIZE != opts.bank)
+    if (base/BANK_SIZE != opts.bank) {
         err(1, "Not enough space\n");
+        return 1;
+    }
 
     while (offset + blocksize <= BANK_SIZE &&
             fread(buf, blocksize, 1, write_file) == 1) {
